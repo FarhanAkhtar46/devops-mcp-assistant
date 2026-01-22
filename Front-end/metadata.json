@@ -1,0 +1,5 @@
+{
+  "name": "Azure DevOps AI Dashboard",
+  "description": "A production-grade DevOps assistant dashboard for sprint insights, code review analytics, and AI-powered planning recommendations.",
+  "requestFramePermissions": []
+}

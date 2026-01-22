@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+.env
+*.venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# VS Code
+.vscode/
+
+# Node.js / Front-end
+Front-end/node_modules/
+Front-end/dist/
+Front-end/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Misc
+*.swp
+*.swo
+
+# Test/coverage
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Azure/Secrets
+*.azure/
+*.key
+*.pem
+*.crt
