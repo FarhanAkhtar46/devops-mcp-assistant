@@ -1,40 +1,37 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, Legend, Cell, PieChart, Pie
 } from 'recharts';
 import { Target, Flag, Zap, Clock, ChevronDown, Filter } from 'lucide-react';
-
-const mockSprints = [
-  { id: '1', name: 'Sprint 24.1: Auth Refactor', status: 'completed' },
-  { id: '2', name: 'Sprint 24.2: Payment Gateway', status: 'active' },
-  { id: '3', name: 'Sprint 24.3: Analytics Engine', status: 'planning' },
-];
-
-const mockBurndown = [
-  { day: 'Day 1', remaining: 100, ideal: 100 },
-  { day: 'Day 2', remaining: 92, ideal: 90 },
-  { day: 'Day 3', remaining: 85, ideal: 80 },
-  { day: 'Day 4', remaining: 70, ideal: 70 },
-  { day: 'Day 5', remaining: 65, ideal: 60 },
-  { day: 'Day 6', remaining: 50, ideal: 50 },
-  { day: 'Day 7', remaining: 45, ideal: 40 },
-  { day: 'Day 8', remaining: 30, ideal: 30 },
-  { day: 'Day 9', remaining: 15, ideal: 20 },
-  { day: 'Day 10', remaining: 0, ideal: 10 },
-];
-
-const mockMemberCapacity = [
-  { name: 'Sarah', capacity: 40, assigned: 38 },
-  { name: 'James', capacity: 40, assigned: 42 },
-  { name: 'Emily', capacity: 35, assigned: 25 },
-  { name: 'Marcus', capacity: 40, assigned: 40 },
-  { name: 'Olivia', capacity: 20, assigned: 18 },
-];
+import { useSprints, useSprintInsights } from '../services/queries';
 
 export const Sprints: React.FC = () => {
-  const [selectedSprint, setSelectedSprint] = useState(mockSprints[1]);
+  const { data: sprints = [], isLoading: sprintsLoading, error: sprintsError } = useSprints();
+  const [selectedSprintId, setSelectedSprintId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!selectedSprintId && sprints.length > 0) {
+      const current = sprints.find(s => s.status === 'current') || sprints[0];
+      setSelectedSprintId(current.id);
+    }
+  }, [sprints, selectedSprintId]);
+
+  const selectedSprint = useMemo(
+    () => sprints.find(s => s.id === selectedSprintId),
+    [sprints, selectedSprintId]
+  );
+
+  const { data: insights, isLoading: insightsLoading, error: insightsError } = useSprintInsights(selectedSprintId);
+
+  const daysLeft = useMemo(() => {
+    if (!selectedSprint?.endDate) return 0;
+    const end = new Date(selectedSprint.endDate).getTime();
+    const now = Date.now();
+    const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+    return Math.max(diff, 0);
+  }, [selectedSprint]);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-700">
@@ -45,11 +42,17 @@ export const Sprints: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
-            <button className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm font-semibold hover:border-azure-500 transition-colors">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-              {selectedSprint.name}
-              <ChevronDown size={16} />
-            </button>
+            <select
+              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm font-semibold hover:border-azure-500 transition-colors appearance-none pr-10"
+              value={selectedSprintId}
+              onChange={(e) => setSelectedSprintId(e.target.value)}
+              disabled={sprintsLoading || sprints.length === 0}
+            >
+              {sprints.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="absolute right-3 top-3.5 text-slate-500 pointer-events-none" />
           </div>
           <button className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl hover:text-slate-800 transition-colors">
             <Filter size={20} />
@@ -57,13 +60,17 @@ export const Sprints: React.FC = () => {
         </div>
       </div>
 
+      {(sprintsError || insightsError) && (
+        <div className="text-rose-500">Failed to load sprint data.</div>
+      )}
+
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Progress', value: '68%', icon: Target, color: 'azure' },
-          { label: 'Completed', value: '24/38', icon: Flag, color: 'emerald' },
-          { label: 'Velocity', value: '52 pts', icon: Zap, color: 'amber' },
-          { label: 'Days Left', value: '4 days', icon: Clock, color: 'rose' },
+          { label: 'Progress', value: `${insights?.progress ?? 0}%`, icon: Target, color: 'azure' },
+          { label: 'Completed', value: `${insights?.completedItems ?? 0}/${insights?.totalItems ?? 0}`, icon: Flag, color: 'emerald' },
+          { label: 'Velocity', value: `${insights?.velocity ?? 0} pts`, icon: Zap, color: 'amber' },
+          { label: 'Days Left', value: `${daysLeft} days`, icon: Clock, color: 'rose' },
         ].map((stat, i) => (
           <div key={i} className="bg-white dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
             <div className="flex items-center gap-4">
@@ -85,7 +92,7 @@ export const Sprints: React.FC = () => {
           <h3 className="text-xl font-bold mb-6">Burndown Chart</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={mockBurndown}>
+              <LineChart data={insights?.burndownData ?? []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#33415510" />
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
@@ -104,7 +111,7 @@ export const Sprints: React.FC = () => {
         <div className="bg-white dark:bg-slate-800/50 p-8 rounded-3xl border border-slate-200 dark:border-slate-700/50">
           <h3 className="text-xl font-bold mb-6">Member Capacity</h3>
           <div className="space-y-6">
-            {mockMemberCapacity.map((member, i) => {
+            {(insights?.memberCapacity ?? []).map((member, i) => {
               const percentage = (member.assigned / member.capacity) * 100;
               const isOver = percentage > 100;
               return (
@@ -128,7 +135,7 @@ export const Sprints: React.FC = () => {
           <div className="mt-8 p-4 bg-azure-50 dark:bg-azure-900/10 rounded-2xl border border-azure-100 dark:border-azure-900/20 flex items-start gap-3">
             <Zap className="text-azure-600 shrink-0" size={20} />
             <p className="text-xs text-azure-800 dark:text-azure-300 leading-relaxed">
-              <span className="font-bold">AI Insight:</span> James is currently over capacity by 5%. Consider shifting 4 hours of low-priority tasks to Emily to balance the load.
+              <span className="font-bold">AI Insight:</span> Capacity insights update as assignments change in Azure DevOps.
             </p>
           </div>
         </div>
